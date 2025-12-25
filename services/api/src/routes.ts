@@ -8,6 +8,7 @@ export const routes = Router();
 const NO_SHOW_THRESHOLD_MINUTES = 30;
 const RATE_LIMIT_TRUST_THRESHOLD = 50;
 const BLOCK_TRUST_THRESHOLD = 25;
+let warnedMissingVapidKey = false;
 
 type TrustStatus = "good" | "rate_limited" | "blocked";
 
@@ -42,6 +43,13 @@ const sendWakePush = async (tokens: string[], data: Record<string, string>): Pro
   const uniqueTokens = Array.from(new Set(tokens.map((token) => token.trim()).filter(Boolean)));
   if (uniqueTokens.length === 0) {
     return;
+  }
+
+  const vapidPrivateKey = process.env.FIREBASE_VAPID_PRIVATE_KEY;
+  if (!vapidPrivateKey && !warnedMissingVapidKey) {
+    warnedMissingVapidKey = true;
+    // eslint-disable-next-line no-console
+    console.warn("FIREBASE_VAPID_PRIVATE_KEY is not set for FCM web push delivery.");
   }
 
   try {
