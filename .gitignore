@@ -13,7 +13,7 @@ build/
 .firebase/
 firestore-debug.log
 firebase-debug.log
-firebase.json
+service-account.json
 
 # Env
 .env
