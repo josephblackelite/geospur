@@ -6,12 +6,26 @@ import { getFirestore, getMessaging } from "./firestore";
 export const routes = Router();
 
 const NO_SHOW_THRESHOLD_MINUTES = 30;
+const RATE_LIMIT_TRUST_THRESHOLD = 50;
+const BLOCK_TRUST_THRESHOLD = 25;
+
+type TrustStatus = "good" | "rate_limited" | "blocked";
 
 const ensureString = (value: unknown, field: string): string => {
   if (typeof value !== "string" || value.trim().length === 0) {
     throw new Error(`Invalid ${field}`);
   }
   return value.trim();
+};
+
+const getTrustStatus = (trustScore: number): TrustStatus => {
+  if (trustScore < BLOCK_TRUST_THRESHOLD) {
+    return "blocked";
+  }
+  if (trustScore < RATE_LIMIT_TRUST_THRESHOLD) {
+    return "rate_limited";
+  }
+  return "good";
 };
 
 const extractTokens = (data?: { fcmTokens?: unknown }): string[] => {
@@ -75,9 +89,15 @@ routes.get("/health", (_req, res) => {
   res.status(200).json({ status: "ok" });
 });
 
-routes.get("/me", verifyFirebaseToken, (req, res) => {
+routes.get("/me", verifyFirebaseToken, async (req, res) => {
   const { uid } = (req as AuthenticatedRequest).user;
-  res.status(200).json({ uid });
+  const db = getFirestore();
+  const userSnap = await db.collection("users").doc(uid).get();
+  const userData = userSnap.data() as { trustScore?: number } | undefined;
+  const trustScore = userData?.trustScore ?? 100;
+  const trustStatus = getTrustStatus(trustScore);
+
+  res.status(200).json({ uid, trustScore, trustStatus });
 });
 
 routes.post("/register-push-token", verifyFirebaseToken, async (req, res) => {
@@ -146,6 +166,27 @@ routes.post("/route-request", verifyFirebaseToken, async (req, res) => {
 
     if (requestData.createdByUid !== uid) {
       res.status(403).json({ error: "Not authorized for request" });
+      return;
+    }
+
+    const userSnap = await db.collection("users").doc(uid).get();
+    const userData = userSnap.data() as { trustScore?: number } | undefined;
+    const trustScore = userData?.trustScore ?? 100;
+    const trustStatus = getTrustStatus(trustScore);
+    if (trustStatus === "blocked") {
+      res.status(403).json({
+        error: "Account is blocked due to low trust score.",
+        trustScore,
+        trustStatus,
+      });
+      return;
+    }
+    if (trustStatus === "rate_limited") {
+      res.status(429).json({
+        error: "Account is rate limited due to low trust score.",
+        trustScore,
+        trustStatus,
+      });
       return;
     }
 
@@ -472,12 +513,22 @@ routes.post("/cancel-request", verifyFirebaseToken, async (req, res) => {
         throw new Error("Request cannot be cancelled");
       }
 
+      const applyLateCancelPenalty = requestData.status === "accepted";
       acceptedBusinessId = requestData.acceptedBusinessId ?? null;
 
       transaction.update(requestRef, {
         status: "cancelled",
         cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
       });
+
+      if (applyLateCancelPenalty && requestData.createdByUid) {
+        const userRef = db.collection("users").doc(requestData.createdByUid);
+        const userSnap = await transaction.get(userRef);
+        const userData = userSnap.data() as { trustScore?: number } | undefined;
+        const currentTrust = userData?.trustScore ?? 100;
+        const nextTrust = Math.max(0, currentTrust - 10);
+        transaction.set(userRef, { trustScore: nextTrust }, { merge: true });
+      }
     });
 
     if (acceptedBusinessId) {

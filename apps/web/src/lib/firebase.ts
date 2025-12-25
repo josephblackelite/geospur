@@ -27,6 +27,8 @@ export type RequestStatus =
   | "no_show"
   | "cancelled";
 
+export type TrustStatus = "good" | "rate_limited" | "blocked";
+
 export type RequestDoc = {
   createdByUid?: string;
   rawQuery: string;
@@ -64,6 +66,20 @@ export type ChatMessageDoc = {
   createdAt?: Timestamp;
 };
 
+export type UserDoc = {
+  trustScore?: number;
+};
+
+export const trustStatusFromScore = (trustScore: number): TrustStatus => {
+  if (trustScore < 25) {
+    return "blocked";
+  }
+  if (trustScore < 50) {
+    return "rate_limited";
+  }
+  return "good";
+};
+
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -93,6 +109,25 @@ export const getMessagingClient = async (): Promise<Messaging | null> => {
 
   messagingClient = getMessaging(app);
   return messagingClient;
+};
+
+export const listenToUserTrust = (
+  userId: string,
+  onData: (data: { trustScore: number; trustStatus: TrustStatus } | null) => void
+): Unsubscribe => {
+  const userRef = doc(db, "users", userId);
+
+  return onSnapshot(userRef, (snapshot) => {
+    if (!snapshot.exists()) {
+      onData(null);
+      return;
+    }
+
+    const userData = snapshot.data() as UserDoc;
+    const trustScore = userData.trustScore ?? 100;
+
+    onData({ trustScore, trustStatus: trustStatusFromScore(trustScore) });
+  });
 };
 
 export const listenToRequest = (
