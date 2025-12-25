@@ -14,3 +14,6 @@ build/
 firestore-debug.log
 firebase-debug.log
 firebase.json
+
+# Env
+.env
