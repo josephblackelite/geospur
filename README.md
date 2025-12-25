@@ -50,6 +50,16 @@ No root workspace `package.json` yet. We'll add one once we start managing share
 - Firebase CLI (`npm install -g firebase-tools`)
 - A Firebase project (see the next section)
 
+### Local development configuration
+
+- Place `.env` files alongside each app:
+  - `apps/web/.env` for the SvelteKit client.
+  - `services/api/.env` (or shell env vars) for the Express API.
+- Set `GOOGLE_APPLICATION_CREDENTIALS` to an absolute path for your service account JSON
+  (for example, `/Users/you/.config/gcloud/geospur-service-account.json`).
+- ⚠️ **Never commit private keys or service account JSON files**. Keep them in your local
+  secrets manager or ignored `.env` files only.
+
 ### Firebase project configuration
 
 1. Create a Firebase project in the console.
@@ -58,6 +68,7 @@ No root workspace `package.json` yet. We'll add one once we start managing share
    - **Firestore** (native mode)
    - **Storage** (for offer photos)
    - **Cloud Messaging** (for push notifications)
+   - **Hosting** (for the web client)
 3. Create a **Web App** in Firebase to generate the client config (used by the SvelteKit app).
 4. Create a **Service Account** (or use Application Default Credentials) for the API:
    - Download the JSON key and set `GOOGLE_APPLICATION_CREDENTIALS` to its path, **or**
@@ -113,6 +124,15 @@ npx tsx src/index.ts
 Once `services/api/package.json` exists, prefer `npm run dev` (or a similar script) to keep the command short.
 
 ## Deployment scope
+
+### Deploy configuration
+
+- Ensure `GOOGLE_APPLICATION_CREDENTIALS` is set in the API runtime environment (or use
+  Application Default Credentials in your host platform).
+- Hosting domains:
+  - `geospur.web.app`
+  - `geospur.firebaseapp.com`
+- ⚠️ **Never commit private keys or service account JSON files** to the repo.
 
 ### Web (Firebase Hosting)
 
