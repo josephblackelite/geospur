@@ -1,0 +1,266 @@
+Perfect — this is **the correct call**, and we can add **push notifications cleanly without breaking your “minimal / no-SSR / low-cost” rules**.
+
+Below is a **tight, Codex-ready ADDENDUM** that **bakes push notifications into the infrastructure**, without adding complexity, background listeners, or cost explosions.
+
+This integrates **Firebase Cloud Messaging (FCM)** in the **safest possible way**.
+
+---
+
+# 🔔 ADDENDUM — PUSH NOTIFICATIONS (MVP-CRITICAL, MINIMAL)
+
+## Push Notifications ARE REQUIRED
+
+Push is not optional for GeoSpur.
+
+Without push:
+
+* Businesses miss intents
+* Response times exceed 60s
+* The marketplace collapses
+
+Push must be:
+
+* **Immediate**
+* **Reliable**
+* **Simple**
+* **Server-triggered only**
+
+---
+
+# 🎯 PUSH NOTIFICATION PRINCIPLES (LOCK THESE)
+
+1. **Only Express sends push**
+2. **No Firestore triggers**
+3. **No background Cloud Functions**
+4. **No fanout logic on the client**
+5. **Push is transactional, not informational**
+
+This avoids:
+
+* runaway costs
+* duplicate notifications
+* race conditions
+* “ghost pings”
+
+---
+
+# 🧱 TECH STACK (UNCHANGED + FCM)
+
+* Firebase Auth (Phone OTP)
+* Firestore (realtime)
+* Firebase Storage (photos)
+* **Firebase Cloud Messaging (FCM)** ✅
+* Express API (single service)
+* SvelteKit (client-only)
+
+---
+
+# 📲 PUSH EVENTS (MVP ONLY)
+
+### Push is sent for **exactly these events**:
+
+### 1️⃣ New Intent for Business
+
+**When:**
+A request is routed to a business
+
+**Sent by:**
+`POST /route-request` (Express)
+
+**Message:**
+
+```
+New request nearby
+“Best hangout tonight”
+2.1 km away
+```
+
+---
+
+### 2️⃣ Offer Accepted (Business)
+
+**When:**
+User clicks Accept
+
+**Sent by:**
+`POST /accept-offer`
+
+**Message:**
+
+```
+Your offer was accepted
+Customer is on the way
+```
+
+---
+
+### 3️⃣ New Chat Message
+
+**When:**
+A new chat message arrives
+
+**Sent by:**
+`POST /send-message`
+
+**Message:**
+
+```
+New message from customer
+```
+
+---
+
+### 4️⃣ Request Cancelled / No-Show
+
+**When:**
+User cancels OR business marks no-show
+
+**Sent by:**
+`POST /mark-no-show` or `/mark-completed`
+
+---
+
+# 🔐 FCM TOKEN MANAGEMENT (MINIMAL)
+
+## Client-side (SvelteKit)
+
+On login:
+
+1. Request notification permission
+2. Get FCM token
+3. POST token to backend
+
+```ts
+POST /register-push-token
+{
+  token: "fcm_token_here",
+  platform: "web"
+}
+```
+
+---
+
+## Firestore Storage
+
+### users/{uid}
+
+```js
+{
+  fcmTokens: ["token1", "token2"]
+}
+```
+
+### businesses/{bid}
+
+```js
+{
+  fcmTokens: ["token1"]
+}
+```
+
+Tokens are:
+
+* appended
+* de-duped
+* pruned on send failure
+
+---
+
+# 🧠 HOW PUSH IS SENT (IMPORTANT)
+
+### Express is the **ONLY sender**
+
+Express uses:
+
+* Firebase Admin SDK
+* `sendMulticast()` for fanout
+
+### Example (pseudo):
+
+```ts
+admin.messaging().sendMulticast({
+  tokens: business.fcmTokens,
+  notification: {
+    title: "New request nearby",
+    body: request.rawQuery
+  },
+  data: {
+    requestId
+  }
+})
+```
+
+No Firestore triggers.
+No listeners.
+No retries loop.
+
+---
+
+# 🧯 FAIL-SAFE RULES (VERY IMPORTANT)
+
+1. **If push fails**, app still works via realtime Firestore
+2. **Push is a wake-up signal**, not the data source
+3. UI always reads state from Firestore
+4. Push never mutates state
+
+This prevents double actions.
+
+---
+
+# 🚦 RATE LIMITS (ANTI-SPAM)
+
+* Max 1 push per business per request
+* Do not re-push if business ignored
+* Respect business `isOnline = false`
+
+---
+
+# 🛑 WHAT WE DO NOT DO (EVEN WITH PUSH)
+
+❌ No marketing pushes
+❌ No reminders
+❌ No “you missed this”
+❌ No cron jobs
+❌ No batch campaigns
+
+Push is **only for live events**.
+
+---
+
+# 🔒 SECURITY RULES (PUSH)
+
+* Only backend can write FCM tokens
+* Clients cannot send push
+* Tokens tied to authenticated UID/BID
+
+---
+
+# 🧠 FINAL CODEX INSTRUCTION (COPY VERBATIM)
+
+> **Integrate Firebase Cloud Messaging (FCM) for push notifications.
+> Push notifications must be sent only from the Express API (no Firestore triggers).
+> Push is required for new business intents, offer acceptance, and chat messages.
+> Push acts as a wake-up signal; UI state must always be sourced from Firestore.**
+
+---
+
+# ✅ WHY THIS FITS YOUR “MINIMAL, UNBREAKABLE MVP”
+
+* No SSR issues
+* No static adapter issues
+* No background cost explosions
+* No duplicated logic
+* Push + realtime = fast responses
+
+This is **exactly** how you get <60s response times in production.
+
+---
+
+## If you want next, I can:
+
+* merge this into the **final Codex task**
+* write **FCM registration code (Svelte + Express)**
+* define **push payload schemas**
+* or add **push failure handling logic**
+
+Just tell me the next command.
