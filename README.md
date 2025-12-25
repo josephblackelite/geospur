@@ -10,6 +10,25 @@ Real-time intent broadcast platform for local businesses.
 
 Status: 🚧 MVP in active development
 
+## Release readiness checklist
+
+- [ ] Core flows working (sign-in, create offer, browse offers, respond)
+- [ ] Offers/chat realtime updates
+- [ ] Photo attachments (upload + display)
+- [ ] Push notifications (opt-in + receipt)
+- [ ] Trust logic (validation and enforcement)
+- [ ] No SSR (client-only rendering confirmed)
+
+### Minimal sanity-test checklist (manual)
+
+- [ ] Sign in with a test account.
+- [ ] Create an offer and confirm it appears in the list for another user.
+- [ ] Open a chat on an offer and verify realtime message delivery.
+- [ ] Attach a photo to an offer and confirm it renders.
+- [ ] Enable push notifications and confirm a test notification arrives.
+- [ ] Trigger a trust rule (e.g., blocked/limited user) and confirm enforcement.
+- [ ] Hard refresh and confirm the app stays client-only (no SSR responses).
+
 ## Repo Layout
 
 ```
