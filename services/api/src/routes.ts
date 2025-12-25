@@ -276,7 +276,13 @@ routes.post("/respond-offer", verifyFirebaseToken, async (req, res) => {
       }
 
       if (Array.isArray(photoUrls)) {
-        offerPayload.photoUrls = photoUrls.filter((url) => typeof url === "string");
+        const cleanedUrls = photoUrls.filter((url) => typeof url === "string");
+        if (cleanedUrls.length > 3) {
+          throw new Error("Photo limit exceeded");
+        }
+        if (cleanedUrls.length > 0) {
+          offerPayload.photoUrls = cleanedUrls;
+        }
       }
 
       transaction.set(offerRef, offerPayload);

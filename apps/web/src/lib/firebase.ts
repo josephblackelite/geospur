@@ -47,6 +47,7 @@ export type OfferDoc = {
   message: string;
   price?: number;
   eta?: string;
+  photoUrls?: string[];
   createdAt?: Timestamp;
 };
 
