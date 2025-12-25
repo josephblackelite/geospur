@@ -94,7 +94,7 @@ We optimize for:
 
 - Firebase Auth (Phone OTP)
 - Firestore (realtime)
-- Firebase Cloud Messaging (optional later)
+- Firebase Cloud Messaging (required)
 
 ### Rules
 
@@ -400,7 +400,6 @@ Enforcement:
 - ❌ Inventory
 - ❌ Ads
 - ❌ Multiple categories per business
-- ❌ Push notifications (polling OK)
 - ❌ Maps UI
 
 ---
@@ -753,6 +752,7 @@ No galleries, no feeds, no reuse.
 
 ```
 POST /route-request
+POST /register-push-token
 POST /respond-offer
 POST /accept-offer
 POST /mark-completed
@@ -766,6 +766,34 @@ All endpoints:
 - no background triggers
 - no cron
 - no listeners
+
+---
+
+# 🔔 PUSH NOTIFICATIONS (MVP-CRITICAL)
+
+Push is REQUIRED for:
+
+- New intent delivered to business
+- Offer accepted
+- New chat message
+- Cancellation / no-show
+
+Implementation rules (LOCKED):
+
+- Push sent only from Express
+- No Firestore triggers
+- No cron
+- No retries loop
+- Push = wake-up signal only
+- UI state always read from Firestore
+
+FCM token handling:
+
+- Client registers token after login
+- Token sent to backend via API (POST /register-push-token)
+- Tokens stored on:
+  - users/{uid}.fcmTokens[]
+  - businesses/{bid}.fcmTokens[]
 
 ---
 
@@ -808,7 +836,6 @@ Enforcement:
 - Reviews
 - Inventory
 - Maps UI
-- Push notifications
 - Background Cloud Functions
 
 ---
@@ -845,4 +872,3 @@ This setup:
 - Is easy to refactor later
 
 This is the right MVP architecture.
-
