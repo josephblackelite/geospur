@@ -77,6 +77,7 @@ storageBucket     -> VITE_FIREBASE_STORAGE_BUCKET
 messagingSenderId -> VITE_FIREBASE_MESSAGING_SENDER_ID
 appId             -> VITE_FIREBASE_APP_ID
 measurementId     -> VITE_FIREBASE_MEASUREMENT_ID
+vapidPublicKey    -> VITE_FIREBASE_VAPID_PUBLIC_KEY
 ```
 
 Server-only env vars (API-only, never expose to the client):
@@ -176,4 +177,3 @@ npx cap sync ios
 ```
 
 Then open the generated iOS project in Xcode (`apps/web/ios`) and configure signing, icons, and push entitlement settings.
-
