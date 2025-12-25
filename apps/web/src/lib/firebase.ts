@@ -24,7 +24,8 @@ export type RequestStatus =
   | "broadcasting"
   | "accepted"
   | "completed"
-  | "no_show";
+  | "no_show"
+  | "cancelled";
 
 export type RequestDoc = {
   createdByUid?: string;

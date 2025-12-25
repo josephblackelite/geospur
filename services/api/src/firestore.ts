@@ -17,3 +17,7 @@ export const getFirestore = (): admin.firestore.Firestore => {
 export const getAuth = (): admin.auth.Auth => {
   return getFirebaseApp().auth();
 };
+
+export const getMessaging = (): admin.messaging.Messaging => {
+  return getFirebaseApp().messaging();
+};

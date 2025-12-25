@@ -1,7 +1,7 @@
 import { Router } from "express";
 import admin from "firebase-admin";
 import { type AuthenticatedRequest, verifyFirebaseToken } from "./auth";
-import { getFirestore } from "./firestore";
+import { getFirestore, getMessaging } from "./firestore";
 
 export const routes = Router();
 
@@ -12,6 +12,34 @@ const ensureString = (value: unknown, field: string): string => {
     throw new Error(`Invalid ${field}`);
   }
   return value.trim();
+};
+
+const extractTokens = (data?: { fcmTokens?: unknown }): string[] => {
+  if (!data || !Array.isArray(data.fcmTokens)) {
+    return [];
+  }
+
+  return data.fcmTokens.filter(
+    (token): token is string => typeof token === "string" && token.trim().length > 0
+  );
+};
+
+const sendWakePush = async (tokens: string[], data: Record<string, string>): Promise<void> => {
+  const uniqueTokens = Array.from(new Set(tokens.map((token) => token.trim()).filter(Boolean)));
+  if (uniqueTokens.length === 0) {
+    return;
+  }
+
+  try {
+    const messaging = getMessaging();
+    await messaging.sendEachForMulticast({
+      tokens: uniqueTokens,
+      data,
+    });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error("Failed to send push notification", error);
+  }
 };
 
 const resolveCategory = (rawQuery: string): string => {
@@ -50,6 +78,48 @@ routes.get("/health", (_req, res) => {
 routes.get("/me", verifyFirebaseToken, (req, res) => {
   const { uid } = (req as AuthenticatedRequest).user;
   res.status(200).json({ uid });
+});
+
+routes.post("/register-push-token", verifyFirebaseToken, async (req, res) => {
+  const db = getFirestore();
+  try {
+    const token = ensureString(req.body.token, "token");
+    const businessId =
+      typeof req.body.businessId === "string" && req.body.businessId.trim().length > 0
+        ? req.body.businessId.trim()
+        : undefined;
+    const { uid } = (req as AuthenticatedRequest).user;
+
+    await db.runTransaction(async (transaction) => {
+      const userRef = db.collection("users").doc(uid);
+      transaction.set(
+        userRef,
+        { fcmTokens: admin.firestore.FieldValue.arrayUnion(token) },
+        { merge: true }
+      );
+
+      if (businessId) {
+        const businessRef = db.collection("businesses").doc(businessId);
+        const businessSnap = await transaction.get(businessRef);
+        if (!businessSnap.exists) {
+          throw new Error("Business not found");
+        }
+        const businessData = businessSnap.data() as { ownerUid?: string };
+        if (businessData.ownerUid !== uid) {
+          throw new Error("Not authorized for business");
+        }
+        transaction.set(
+          businessRef,
+          { fcmTokens: admin.firestore.FieldValue.arrayUnion(token) },
+          { merge: true }
+        );
+      }
+    });
+
+    res.status(200).json({ status: "ok" });
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
 });
 
 routes.post("/route-request", verifyFirebaseToken, async (req, res) => {
@@ -93,12 +163,14 @@ routes.post("/route-request", verifyFirebaseToken, async (req, res) => {
 
     const batch = db.batch();
     let deliveriesCreated = 0;
+    const deliveryTokens: string[] = [];
 
     businessesSnapshot.forEach((businessDoc) => {
       const business = businessDoc.data() as {
         lat: number;
         lng: number;
         radiusKm: number;
+        fcmTokens?: unknown;
       };
 
       const distance = distanceKm(
@@ -118,6 +190,7 @@ routes.post("/route-request", verifyFirebaseToken, async (req, res) => {
           { merge: true }
         );
         deliveriesCreated += 1;
+        deliveryTokens.push(...extractTokens(business));
       }
     });
 
@@ -130,6 +203,11 @@ routes.post("/route-request", verifyFirebaseToken, async (req, res) => {
     }
 
     await batch.commit();
+
+    await sendWakePush(deliveryTokens, {
+      type: "intent_delivered",
+      requestId,
+    });
 
     res.status(200).json({ deliveriesCreated, resolvedCategory });
   } catch (error) {
@@ -274,7 +352,137 @@ routes.post("/accept-offer", verifyFirebaseToken, async (req, res) => {
       });
     });
 
+    const businessSnap = await db.collection("businesses").doc(acceptedBusinessId).get();
+    await sendWakePush(extractTokens(businessSnap.data() as { fcmTokens?: unknown }), {
+      type: "offer_accepted",
+      requestId,
+      chatId: chatRef.id,
+    });
+
     res.status(200).json({ chatId: chatRef.id, businessId: acceptedBusinessId });
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+routes.post("/send-chat-message", verifyFirebaseToken, async (req, res) => {
+  const db = getFirestore();
+  try {
+    const chatId = ensureString(req.body.chatId, "chatId");
+    const text = ensureString(req.body.text, "text");
+    const { uid } = (req as AuthenticatedRequest).user;
+
+    const chatRef = db.collection("chats").doc(chatId);
+    const messageRef = chatRef.collection("messages").doc();
+
+    let recipientUserId: string | null = null;
+    let recipientBusinessId: string | null = null;
+    let senderType: "user" | "business" = "user";
+    let requestId = "";
+
+    await db.runTransaction(async (transaction) => {
+      const chatSnap = await transaction.get(chatRef);
+      if (!chatSnap.exists) {
+        throw new Error("Chat not found");
+      }
+
+      const chatData = chatSnap.data() as { userId: string; businessId: string; requestId: string };
+      requestId = chatData.requestId;
+
+      if (chatData.userId === uid) {
+        senderType = "user";
+        recipientBusinessId = chatData.businessId;
+      } else {
+        const businessRef = db.collection("businesses").doc(chatData.businessId);
+        const businessSnap = await transaction.get(businessRef);
+        if (!businessSnap.exists) {
+          throw new Error("Business not found");
+        }
+        const businessData = businessSnap.data() as { ownerUid?: string };
+        if (businessData.ownerUid !== uid) {
+          throw new Error("Not authorized for chat");
+        }
+        senderType = "business";
+        recipientUserId = chatData.userId;
+      }
+
+      transaction.set(messageRef, {
+        senderType,
+        text,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+
+    if (recipientUserId) {
+      const userSnap = await db.collection("users").doc(recipientUserId).get();
+      await sendWakePush(extractTokens(userSnap.data() as { fcmTokens?: unknown }), {
+        type: "chat_message",
+        chatId,
+        requestId,
+      });
+    }
+
+    if (recipientBusinessId) {
+      const businessSnap = await db.collection("businesses").doc(recipientBusinessId).get();
+      await sendWakePush(extractTokens(businessSnap.data() as { fcmTokens?: unknown }), {
+        type: "chat_message",
+        chatId,
+        requestId,
+      });
+    }
+
+    res.status(200).json({ messageId: messageRef.id });
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+routes.post("/cancel-request", verifyFirebaseToken, async (req, res) => {
+  const db = getFirestore();
+  try {
+    const requestId = ensureString(req.body.requestId, "requestId");
+    const { uid } = (req as AuthenticatedRequest).user;
+    const requestRef = db.collection("requests").doc(requestId);
+
+    let acceptedBusinessId: string | null = null;
+
+    await db.runTransaction(async (transaction) => {
+      const requestSnap = await transaction.get(requestRef);
+      if (!requestSnap.exists) {
+        throw new Error("Request not found");
+      }
+
+      const requestData = requestSnap.data() as {
+        createdByUid?: string;
+        status: string;
+        acceptedBusinessId?: string;
+      };
+
+      if (requestData.createdByUid !== uid) {
+        throw new Error("Not authorized for request");
+      }
+
+      if (requestData.status !== "broadcasting" && requestData.status !== "accepted") {
+        throw new Error("Request cannot be cancelled");
+      }
+
+      acceptedBusinessId = requestData.acceptedBusinessId ?? null;
+
+      transaction.update(requestRef, {
+        status: "cancelled",
+        cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+
+    if (acceptedBusinessId) {
+      const businessSnap = await db.collection("businesses").doc(acceptedBusinessId).get();
+      await sendWakePush(extractTokens(businessSnap.data() as { fcmTokens?: unknown }), {
+        type: "request_cancelled",
+        requestId,
+      });
+    }
+
+    res.status(200).json({ status: "cancelled" });
   } catch (error) {
     res.status(400).json({ error: (error as Error).message });
   }
@@ -361,6 +569,8 @@ routes.post("/mark-no-show", verifyFirebaseToken, async (req, res) => {
     const businessRef = db.collection("businesses").doc(businessId);
     const deliveryRef = requestRef.collection("deliveries").doc(businessId);
 
+    let requestUserId: string | null = null;
+
     await db.runTransaction(async (transaction) => {
       const [requestSnap, businessSnap] = await Promise.all([
         transaction.get(requestRef),
@@ -417,6 +627,7 @@ routes.post("/mark-no-show", verifyFirebaseToken, async (req, res) => {
       });
 
       if (requestData.createdByUid) {
+        requestUserId = requestData.createdByUid;
         const userRef = db.collection("users").doc(requestData.createdByUid);
         const userSnap = await transaction.get(userRef);
         const userData = userSnap.data() as { trustScore?: number } | undefined;
@@ -425,6 +636,15 @@ routes.post("/mark-no-show", verifyFirebaseToken, async (req, res) => {
         transaction.set(userRef, { trustScore: nextTrust }, { merge: true });
       }
     });
+
+    if (requestUserId) {
+      const userSnap = await db.collection("users").doc(requestUserId).get();
+      await sendWakePush(extractTokens(userSnap.data() as { fcmTokens?: unknown }), {
+        type: "no_show",
+        requestId,
+        businessId,
+      });
+    }
 
     res.status(200).json({ status: "no_show" });
   } catch (error) {
