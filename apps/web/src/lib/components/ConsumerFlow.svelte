@@ -1,4 +1,8 @@
 <script lang="ts">
+  import { onDestroy } from "svelte";
+  import { currentUser } from "$lib/auth";
+  import { listenToUserTrust, type TrustStatus } from "$lib/firebase";
+
   const steps = [
     {
       title: "Landing",
@@ -31,6 +35,46 @@
   ];
 
   let activeStep = 0;
+  let trustScore = 100;
+  let trustStatus: TrustStatus = "good";
+  let trustNotice = "";
+  let isTrustRestricted = false;
+  let unsubscribeTrust: (() => void) | null = null;
+
+  const unsubscribeAuth = currentUser.subscribe((user) => {
+    if (unsubscribeTrust) {
+      unsubscribeTrust();
+      unsubscribeTrust = null;
+    }
+
+    if (!user) {
+      trustScore = 100;
+      trustStatus = "good";
+      trustNotice = "";
+      isTrustRestricted = false;
+      return;
+    }
+
+    unsubscribeTrust = listenToUserTrust(user.uid, (data) => {
+      if (!data) {
+        trustScore = 100;
+        trustStatus = "good";
+        trustNotice = "";
+        isTrustRestricted = false;
+        return;
+      }
+
+      trustScore = data.trustScore;
+      trustStatus = data.trustStatus;
+      isTrustRestricted = trustStatus !== "good";
+      trustNotice =
+        trustStatus === "blocked"
+          ? `Your trust score is ${trustScore}. New requests are blocked right now.`
+          : trustStatus === "rate_limited"
+            ? `Your trust score is ${trustScore}. Requests are rate limited until it improves.`
+            : "";
+    });
+  });
 
   const nextStep = () => {
     if (activeStep < steps.length - 1) {
@@ -47,6 +91,13 @@
   const acceptOffer = () => {
     activeStep = 5;
   };
+
+  onDestroy(() => {
+    unsubscribeAuth();
+    if (unsubscribeTrust) {
+      unsubscribeTrust();
+    }
+  });
 </script>
 
 <section class="hero">
@@ -77,6 +128,13 @@
       <p>{steps[activeStep].description}</p>
     </header>
 
+    {#if trustNotice}
+      <div class={`trust-banner ${trustStatus}`}>
+        <strong>Trust status</strong>
+        <span>{trustNotice}</span>
+      </div>
+    {/if}
+
     {#if activeStep === 0}
       <div class="card">
         <h3>Welcome to GeoSpur</h3>
@@ -84,7 +142,7 @@
           Browse curated destinations, compare guides, and start a request the moment you need
           help on the ground.
         </p>
-        <button on:click={nextStep}>Draft a request</button>
+        <button on:click={nextStep} disabled={isTrustRestricted}>Draft a request</button>
       </div>
     {:else if activeStep === 1}
       <div class="form-grid">
@@ -103,7 +161,7 @@
       </div>
       <div class="actions">
         <button class="secondary" on:click={prevStep}>Back</button>
-        <button on:click={nextStep}>Continue to OTP</button>
+        <button on:click={nextStep} disabled={isTrustRestricted}>Continue to OTP</button>
       </div>
     {:else if activeStep === 2}
       <div class="otp">
@@ -122,7 +180,9 @@
       </div>
       <div class="actions">
         <button class="secondary" on:click={prevStep}>Back</button>
-        <button on:click={nextStep}>Verify &amp; broadcast</button>
+        <button on:click={nextStep} disabled={isTrustRestricted}>
+          Verify &amp; broadcast
+        </button>
       </div>
     {:else if activeStep === 3}
       <div class="broadcast">
@@ -261,6 +321,31 @@
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+  }
+
+  .trust-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-radius: 0.75rem;
+    font-size: 0.95rem;
+  }
+
+  .trust-banner strong {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.7rem;
+  }
+
+  .trust-banner.rate_limited {
+    background: #fef3c7;
+    color: #92400e;
+  }
+
+  .trust-banner.blocked {
+    background: #fee2e2;
+    color: #991b1b;
   }
 
   header h2 {
