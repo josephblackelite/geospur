@@ -8,11 +8,20 @@ import {
 } from "firebase/auth";
 import { writable } from "svelte/store";
 import { auth } from "./firebase";
+import { registerPushToken } from "./push";
 
 export const currentUser = writable<User | null>(auth.currentUser);
 
 onAuthStateChanged(auth, (user) => {
   currentUser.set(user);
+
+  if (user) {
+    user
+      .getIdToken()
+      .then((token) => registerPushToken(token))
+      // eslint-disable-next-line no-console
+      .catch((error) => console.warn("Failed to register push token", error));
+  }
 });
 
 export const createRecaptchaVerifier = (
