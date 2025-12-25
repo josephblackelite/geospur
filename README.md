@@ -65,23 +65,25 @@ No root workspace `package.json` yet. We'll add one once we start managing share
 
 ### Environment variables
 
-Create `apps/web/.env`:
+Copy `.env.example` to your preferred secrets manager or local env files (for example, `apps/web/.env` for the SvelteKit app and shell env vars for the API). **Do not commit real secrets**.
+
+Firebase web config → SvelteKit `VITE_` env mapping:
 
 ```
-VITE_FIREBASE_API_KEY=...
-VITE_FIREBASE_AUTH_DOMAIN=...
-VITE_FIREBASE_PROJECT_ID=...
-VITE_FIREBASE_STORAGE_BUCKET=...
-VITE_FIREBASE_MESSAGING_SENDER_ID=...
-VITE_FIREBASE_APP_ID=...
-VITE_FIREBASE_MEASUREMENT_ID=...
-VITE_API_BASE_URL=http://localhost:8080
+apiKey            -> VITE_FIREBASE_API_KEY
+authDomain        -> VITE_FIREBASE_AUTH_DOMAIN
+projectId         -> VITE_FIREBASE_PROJECT_ID
+storageBucket     -> VITE_FIREBASE_STORAGE_BUCKET
+messagingSenderId -> VITE_FIREBASE_MESSAGING_SENDER_ID
+appId             -> VITE_FIREBASE_APP_ID
+measurementId     -> VITE_FIREBASE_MEASUREMENT_ID
 ```
 
-For the API, set environment variables in your shell (or use a `.env` loader of your choice):
+Server-only env vars (API-only, never expose to the client):
 
 ```
 GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/service-account.json
+WEB_PUSH_PRIVATE_KEY=your-web-push-private-key
 PORT=8080
 ```
 
@@ -175,26 +177,3 @@ npx cap sync ios
 
 Then open the generated iOS project in Xcode (`apps/web/ios`) and configure signing, icons, and push entitlement settings.
 
-
-firebase credentials:
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyB-zw0KdfAhd2SbT8MAdbECr6QdSVJk5LE",
-  authDomain: "geospur.firebaseapp.com",
-  projectId: "geospur",
-  storageBucket: "geospur.firebasestorage.app",
-  messagingSenderId: "140846310568",
-  appId: "1:140846310568:web:65ecfa8ffb0468cc78ce9d",
-  measurementId: "G-PBW45W50QJ"
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
