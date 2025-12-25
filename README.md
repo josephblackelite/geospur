@@ -174,3 +174,27 @@ npx cap sync ios
 ```
 
 Then open the generated iOS project in Xcode (`apps/web/ios`) and configure signing, icons, and push entitlement settings.
+
+
+firebase credentials:
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyB-zw0KdfAhd2SbT8MAdbECr6QdSVJk5LE",
+  authDomain: "geospur.firebaseapp.com",
+  projectId: "geospur",
+  storageBucket: "geospur.firebasestorage.app",
+  messagingSenderId: "140846310568",
+  appId: "1:140846310568:web:65ecfa8ffb0468cc78ce9d",
+  measurementId: "G-PBW45W50QJ"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
