@@ -872,3 +872,20 @@ This setup:
 - Is easy to refactor later
 
 This is the right MVP architecture.
+
+---
+
+# ✅ Build Task List (from empty directory)
+
+1. Initialize repo and tooling from an empty folder (e.g., `mkdir geospur && cd geospur && git init`) and add base files like `README.md` and `geospur.txt`.
+2. Create the SvelteKit app in `apps/web` (e.g., `npm create svelte@latest apps/web` with client-only settings) and ensure `svelte.config.js` disables SSR.
+3. Add Firebase client config in `apps/web/src/lib/firebase.ts` and wire env vars in `apps/web/.env` (e.g., `VITE_FIREBASE_API_KEY`).
+4. Scaffold the Express API in `services/api` with `src/index.ts` and health check `GET /health`.
+5. Define Firestore schema docs/collections in `services/api/src/firestore/schema.md` (users, businesses, requests, offers, chats) and document key fields.
+6. Implement Auth flow: client login in `apps/web/src/lib/auth.ts` and API middleware in `services/api/src/middleware/auth.ts` using Firebase ID tokens.
+7. Build request flow endpoints in API (`POST /route-request`, `GET /requests/:id`) and UI in `apps/web/src/routes/request/+page.svelte`.
+8. Build business flow endpoints (`GET /business/requests`, `POST /offers`) and UI in `apps/web/src/routes/business/+page.svelte`.
+9. Add offers + chat: API endpoints (`POST /offers/:id/accept`, `POST /chats/:requestId/messages`) and UI in `apps/web/src/routes/request/[id]/+page.svelte`.
+10. Add push notifications setup in `apps/web/src/lib/notifications.ts` and API endpoint `POST /notify` for server-triggered messages.
+11. Enable storage uploads in `apps/web/src/lib/storage.ts` and API endpoint `POST /uploads/presign` (or direct client upload rules).
+12. Run final QA: lint/build (`npm -w apps/web run lint`, `npm -w services/api test`) and verify core flows end-to-end.
