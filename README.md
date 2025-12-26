@@ -69,8 +69,9 @@ No root workspace `package.json` yet. We'll add one once we start managing share
    - **Storage** (for offer photos)
    - **Cloud Messaging** (for push notifications)
    - **Hosting** (for the web client)
-3. Create a **Web App** in Firebase to generate the client config (used by the SvelteKit app).
-4. Create a **Service Account** (or use Application Default Credentials) for the API:
+3. Decide where the API will be hosted (recommended: **Cloud Run**).
+4. Create a **Web App** in Firebase to generate the client config (used by the SvelteKit app).
+5. Create a **Service Account** (or use Application Default Credentials) for the API:
    - Download the JSON key and set `GOOGLE_APPLICATION_CREDENTIALS` to its path, **or**
    - Use `gcloud auth application-default login` locally.
 
@@ -98,6 +99,15 @@ GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/service-account.json
 WEB_PUSH_PRIVATE_KEY=your-web-push-private-key
 PORT=8080
 ```
+
+API base URL (frontend calls the API with this base):
+
+```
+VITE_API_BASE_URL=https://YOUR_CLOUD_RUN_SERVICE_URL
+```
+
+The SvelteKit app calls endpoints like `POST /respond-offer` and `POST /register-push-token`
+using `fetch(`${VITE_API_BASE_URL}/respond-offer`)` in the browser.
 
 ### Run the apps
 
@@ -133,6 +143,8 @@ Once `services/api/package.json` exists, prefer `npm run dev` (or a similar scri
   - `geospur.web.app`
   - `geospur.firebaseapp.com`
 - ⚠️ **Never commit private keys or service account JSON files** to the repo.
+- API hosting (recommended): Cloud Run service URL (for example, `https://geospur-api-xyz.a.run.app`).
+  The frontend points `VITE_API_BASE_URL` at this URL so browser `fetch()` calls reach the API.
 
 ### Web (Firebase Hosting)
 
@@ -155,6 +167,14 @@ Once `services/api/package.json` exists, prefer `npm run dev` (or a similar scri
 - Cloud Messaging (FCM)
 - Hosting
 - Cloud Run (or your chosen API host)
+
+### API hosting + frontend integration (explicit)
+
+- The API is hosted on **Cloud Run** (or another Node.js host). The canonical base URL is the
+  Cloud Run service URL (for example, `https://geospur-api-xyz.a.run.app`).
+- The frontend calls the API directly from the browser using `fetch()` and the
+  `VITE_API_BASE_URL` environment variable (see `apps/web/src/lib/components/OfferResponseForm.svelte`
+  and `apps/web/src/lib/push.ts` for examples).
 
 ## iOS bundling readiness (PWA + optional native wrapper)
 
