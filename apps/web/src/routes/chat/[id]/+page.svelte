@@ -1,7 +1,28 @@
 <script>
   import { page } from '$app/stores';
+  import OfferSummaryCard from '$lib/components/OfferSummaryCard.svelte';
 
   $: chatId = $page.params.id;
+
+  let messages = [
+    {
+      role: 'assistant',
+      text: 'Hi! Ask me anything about your trip or local recommendations.'
+    },
+    {
+      role: 'user',
+      text: 'Show me a sample itinerary for a weekend getaway.'
+    }
+  ];
+
+  const addSystemMessage = (text) => {
+    messages = [...messages, { role: 'system', text }];
+  };
+
+  const handleAcceptOffer = async () => {
+    await fetch('/accept-offer', { method: 'POST' });
+    addSystemMessage('Accepted — on the way');
+  };
 </script>
 
 <svelte:head>
@@ -9,18 +30,23 @@
 </svelte:head>
 
 <section class="chat">
+  <OfferSummaryCard
+    confirmedArrival="Confirmed arrival: 9:45 AM"
+    estimate="Estimate: 15-20 min"
+    onAccept={handleAcceptOffer}
+  />
+
   <div class="header">
     <h1>Chat session {chatId}</h1>
     <p>Placeholder for the consumer chat experience.</p>
   </div>
 
   <div class="message-list">
-    <div class="message assistant">
-      <p>Hi! Ask me anything about your trip or local recommendations.</p>
-    </div>
-    <div class="message user">
-      <p>Show me a sample itinerary for a weekend getaway.</p>
-    </div>
+    {#each messages as message}
+      <div class={`message ${message.role}`}>
+        <p>{message.text}</p>
+      </div>
+    {/each}
   </div>
 
   <div class="composer">
@@ -60,6 +86,14 @@
     justify-self: end;
     background: #dbeafe;
     color: #1e3a8a;
+  }
+
+  .system {
+    justify-self: center;
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px dashed #cbd5f5;
+    font-weight: 600;
   }
 
   .composer {
