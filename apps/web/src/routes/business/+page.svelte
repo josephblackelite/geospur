@@ -74,6 +74,9 @@
 </svelte:head>
 
 <section class="page">
+  <header class="route-toggle">
+    <a class="route-link" href="/">Request view</a>
+  </header>
   <header class="page-header">
     <div>
       <p class="eyebrow">Action Inbox</p>
@@ -153,6 +156,31 @@
 
   .page {
     padding: 2.5rem 0 4rem;
+    position: relative;
+  }
+
+  .route-toggle {
+    position: absolute;
+    top: 24px;
+    right: 24px;
+  }
+
+  .route-link {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid #e2e8f0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+    text-decoration: none;
+  }
+
+  .route-link:hover {
+    color: #0f172a;
+    border-color: #cbd5f5;
   }
 
   .page-header {
