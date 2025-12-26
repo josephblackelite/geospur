@@ -8,6 +8,10 @@ export const routes = Router();
 const NO_SHOW_THRESHOLD_MINUTES = 30;
 const RATE_LIMIT_TRUST_THRESHOLD = 50;
 const BLOCK_TRUST_THRESHOLD = 25;
+const LLM_CATEGORY_TIMEOUT_MS = Number.parseInt(
+  process.env.LLM_CATEGORY_TIMEOUT_MS ?? "2000",
+  10
+);
 let warnedMissingVapidKey = false;
 
 type TrustStatus = "good" | "rate_limited" | "blocked";
@@ -79,6 +83,65 @@ const resolveCategory = (rawQuery: string): string => {
     return "cafe";
   }
   return "general";
+};
+
+const CATEGORY_OPTIONS = ["restaurant", "nightlife", "salon", "cafe", "general"] as const;
+type CategoryOption = (typeof CATEGORY_OPTIONS)[number];
+
+const normalizeCategory = (value: string): CategoryOption | null => {
+  const normalized = value.trim().toLowerCase();
+  return CATEGORY_OPTIONS.includes(normalized as CategoryOption)
+    ? (normalized as CategoryOption)
+    : null;
+};
+
+const resolveCategoryWithLlm = async (rawQuery: string): Promise<CategoryOption> => {
+  const fallback = resolveCategory(rawQuery) as CategoryOption;
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return fallback;
+  }
+
+  const model = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), LLM_CATEGORY_TIMEOUT_MS);
+
+  try {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0,
+        messages: [
+          {
+            role: "system",
+            content:
+              "Classify the user request into exactly one category from: restaurant, nightlife, salon, cafe, general. Respond with only the category label.",
+          },
+          { role: "user", content: rawQuery },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      return fallback;
+    }
+
+    const data = (await response.json()) as {
+      choices?: { message?: { content?: string | null } | null }[];
+    };
+    const content = data.choices?.[0]?.message?.content ?? "";
+    return normalizeCategory(content) ?? fallback;
+  } catch {
+    return fallback;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 };
 
 const toRadians = (value: number): number => (value * Math.PI) / 180;
@@ -203,7 +266,9 @@ routes.post("/route-request", verifyFirebaseToken, async (req, res) => {
       return;
     }
 
-    const resolvedCategory = requestData.resolvedCategory ?? resolveCategory(requestData.rawQuery);
+    const resolvedCategory =
+      requestData.resolvedCategory ??
+      (await resolveCategoryWithLlm(requestData.rawQuery));
     const businessesSnapshot = await db
       .collection("businesses")
       .where("category", "==", resolvedCategory)
@@ -244,11 +309,7 @@ routes.post("/route-request", verifyFirebaseToken, async (req, res) => {
     });
 
     if (requestData.resolvedCategory !== resolvedCategory) {
-      batch.set(
-        requestRef,
-        { resolvedCategory },
-        { merge: true }
-      );
+      batch.set(requestRef, { resolvedCategory }, { merge: true });
     }
 
     await batch.commit();

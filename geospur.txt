@@ -199,6 +199,19 @@ When user submits:
 
 #### 3. Intent Inbox
 
+---
+
+## LLM Prompt Template: Request Category Mapping
+
+Use this template when resolving a request category from a raw user query. The model must return
+exactly one label from the allowed set.
+
+**System**
+Classify the user request into exactly one category from: restaurant, nightlife, salon, cafe, general. Respond with only the category label.
+
+**User**
+{{rawQuery}}
+
 - Business listens to:
   requests/*/deliveries/{businessId}
 - Shows incoming requests
