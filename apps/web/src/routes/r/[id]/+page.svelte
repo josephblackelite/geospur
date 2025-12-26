@@ -3,6 +3,7 @@
   import { page } from "$app/stores";
   import { updateProfile } from "firebase/auth";
   import RadarBackdrop from "$components/RadarBackdrop.svelte";
+  import OfferCard from "$components/OfferCard.svelte";
   import OtpModal from "$components/OtpModal.svelte";
   import NameModal from "$components/NameModal.svelte";
   import { currentUser } from "$lib/auth";
@@ -15,7 +16,12 @@
   } from "$lib/firebase";
 
   type RequestData = RequestDoc & { id: string };
-  type OfferData = OfferDoc & { id: string };
+  type OfferData = OfferDoc & {
+    id: string;
+    businessName?: string;
+    distanceMiles?: number;
+    distanceText?: string;
+  };
 
   let requestId = "";
   let request: RequestData | null = null;
@@ -173,6 +179,18 @@
     }
   };
 
+  const formatDistance = (offer: OfferData) => {
+    if (offer.distanceText) {
+      return offer.distanceText;
+    }
+
+    if (typeof offer.distanceMiles === "number") {
+      return `${offer.distanceMiles.toFixed(1)} mi`;
+    }
+
+    return "Nearby";
+  };
+
   onDestroy(() => {
     if (otpTimer) {
       clearTimeout(otpTimer);
@@ -246,6 +264,21 @@
     </div>
   </section>
 </main>
+
+{#if offers.length > 0}
+  <aside class="offer-stack">
+    {#each offers as offer, index (offer.id)}
+      <OfferCard
+        businessName={offer.businessName ?? offer.businessId}
+        distance={formatDistance(offer)}
+        message={offer.message}
+        price={offer.price ?? null}
+        photoUrls={offer.photoUrls ?? []}
+        index={index}
+      />
+    {/each}
+  </aside>
+{/if}
 
 {#if showOtpModal}
   <OtpModal on:verify={handleOtpVerify} error={otpError} isSubmitting={isRoutingRequest} />
@@ -329,6 +362,17 @@
     gap: 1.5rem;
   }
 
+  .offer-stack {
+    position: fixed;
+    right: 1.5rem;
+    bottom: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    width: min(360px, calc(100vw - 3rem));
+    z-index: 3;
+  }
+
   .step {
     display: flex;
     gap: 1rem;
@@ -359,5 +403,13 @@
   .step p {
     margin-top: 0.35rem;
     color: #cbd5f5;
+  }
+
+  @media (max-width: 900px) {
+    .offer-stack {
+      position: static;
+      width: 100%;
+      margin-top: 2rem;
+    }
   }
 </style>
