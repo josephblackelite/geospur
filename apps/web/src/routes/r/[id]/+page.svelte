@@ -37,15 +37,41 @@
   let nameError = "";
   let isSavingName = false;
   let hasSeenFirstOffer = false;
+  let showNoResponseNotice = false;
+  let isRetryingRoute = false;
+  let retryError = "";
+  let notifyRequested = false;
 
   let otpTimer: ReturnType<typeof setTimeout> | null = null;
+  let noResponseTimer: ReturnType<typeof setTimeout> | null = null;
   let unsubscribeRequest: (() => void) | null = null;
   let unsubscribeOffers: (() => void) | null = null;
   let activeRequestId = "";
 
+  const NO_RESPONSE_DELAY_MS = 50000;
+
   const unsubscribeUser = currentUser.subscribe((user) => {
     userName = user?.displayName?.trim() ?? "";
   });
+
+  const startNoResponseTimer = () => {
+    if (noResponseTimer) {
+      clearTimeout(noResponseTimer);
+      noResponseTimer = null;
+    }
+
+    showNoResponseNotice = false;
+
+    if (!requestId) {
+      return;
+    }
+
+    noResponseTimer = setTimeout(() => {
+      if (offers.length === 0) {
+        showNoResponseNotice = true;
+      }
+    }, NO_RESPONSE_DELAY_MS);
+  };
 
   const startOtpTimer = () => {
     if (otpTimer) {
@@ -78,6 +104,9 @@
     showNameModal = false;
     nameError = "";
     hasSeenFirstOffer = false;
+    showNoResponseNotice = false;
+    retryError = "";
+    notifyRequested = false;
 
     if (!id) {
       return;
@@ -101,6 +130,31 @@
     });
   };
 
+  const routeRequest = async () => {
+    if (!requestId) {
+      throw new Error("Missing request ID.");
+    }
+
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) {
+      throw new Error("Sign in to verify your request.");
+    }
+
+    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL ?? ""}/route-request`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ requestId }),
+    });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      throw new Error(payload?.error ?? "Failed to route the request.");
+    }
+  };
+
   const handleOtpVerify = async (event: CustomEvent<{ code: string }>) => {
     if (otpVerified) {
       showOtpModal = false;
@@ -115,33 +169,10 @@
       return;
     }
 
-    if (!requestId) {
-      otpError = "Missing request ID.";
-      return;
-    }
-
-    const token = await auth.currentUser?.getIdToken();
-    if (!token) {
-      otpError = "Sign in to verify your request.";
-      return;
-    }
-
     isRoutingRequest = true;
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL ?? ""}/route-request`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ requestId }),
-      });
-
-      if (!response.ok) {
-        const payload = await response.json().catch(() => null);
-        throw new Error(payload?.error ?? "Failed to route the request.");
-      }
+      await routeRequest();
 
       otpVerified = true;
       showOtpModal = false;
@@ -150,6 +181,30 @@
     } finally {
       isRoutingRequest = false;
     }
+  };
+
+  const handleTryAgain = async () => {
+    retryError = "";
+
+    if (!otpVerified && request?.status === "draft") {
+      showOtpModal = true;
+      return;
+    }
+
+    isRetryingRoute = true;
+
+    try {
+      await routeRequest();
+      startNoResponseTimer();
+    } catch (error) {
+      retryError = (error as Error).message;
+    } finally {
+      isRetryingRoute = false;
+    }
+  };
+
+  const handleNotifyMe = () => {
+    notifyRequested = true;
   };
 
   const handleNameSubmit = async (event: CustomEvent<{ name: string }>) => {
@@ -195,6 +250,9 @@
     if (otpTimer) {
       clearTimeout(otpTimer);
     }
+    if (noResponseTimer) {
+      clearTimeout(noResponseTimer);
+    }
     unsubscribeUser();
     if (unsubscribeRequest) {
       unsubscribeRequest();
@@ -209,6 +267,16 @@
     activeRequestId = requestId;
     ensureSubscriptions(requestId);
     startOtpTimer();
+    startNoResponseTimer();
+  }
+  $: if (offers.length > 0) {
+    showNoResponseNotice = false;
+    retryError = "";
+    notifyRequested = false;
+    if (noResponseTimer) {
+      clearTimeout(noResponseTimer);
+      noResponseTimer = null;
+    }
   }
 </script>
 
@@ -263,6 +331,30 @@
       </div>
     </div>
   </section>
+
+  {#if showNoResponseNotice && offers.length === 0}
+    <section class="no-responses">
+      <div class="no-responses__content">
+        <h2>No responses yet — expanding radius…</h2>
+        <p>
+          We&apos;ll keep searching nearby. You can retry or tweak the request anytime without
+          resetting it.
+        </p>
+        <div class="no-responses__actions">
+          <button class="primary" type="button" on:click={handleTryAgain} disabled={isRetryingRoute}>
+            {isRetryingRoute ? "Retrying..." : "Try again"}
+          </button>
+          <a class="secondary" href="/">Edit request</a>
+          <button class="secondary" type="button" on:click={handleNotifyMe} disabled={notifyRequested}>
+            {notifyRequested ? "We&apos;ll notify you" : "Notify me when someone replies"}
+          </button>
+        </div>
+        {#if retryError}
+          <p class="error">{retryError}</p>
+        {/if}
+      </div>
+    </section>
+  {/if}
 </main>
 
 {#if offers.length > 0}
@@ -360,6 +452,78 @@
   .timeline {
     display: grid;
     gap: 1.5rem;
+  }
+
+  .no-responses {
+    display: flex;
+    justify-content: center;
+    padding: 1.5rem;
+    border-radius: 1.5rem;
+    background: rgba(15, 23, 42, 0.75);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    text-align: center;
+  }
+
+  .no-responses__content {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .no-responses__content h2 {
+    margin: 0;
+    font-size: 1.4rem;
+  }
+
+  .no-responses__content p {
+    margin: 0;
+    color: #cbd5f5;
+  }
+
+  .no-responses__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+  }
+
+  .no-responses__actions button,
+  .no-responses__actions a {
+    border-radius: 999px;
+    padding: 0.65rem 1.4rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    border: 1px solid transparent;
+    text-decoration: none;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+
+  .no-responses__actions button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .no-responses__actions .primary {
+    background: #38bdf8;
+    color: #020617;
+    border-color: rgba(56, 189, 248, 0.8);
+    box-shadow: 0 10px 30px rgba(56, 189, 248, 0.25);
+  }
+
+  .no-responses__actions .secondary {
+    background: rgba(15, 23, 42, 0.2);
+    color: #f8fafc;
+    border-color: rgba(148, 163, 184, 0.4);
+  }
+
+  .no-responses__actions button:hover:not(:disabled),
+  .no-responses__actions a:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.35);
+  }
+
+  .no-responses .error {
+    color: #fca5a5;
   }
 
   .offer-stack {
