@@ -6,8 +6,14 @@
   let requestText = "";
   let isSubmitting = false;
   let errorMessage = "";
+  let isLocationModalOpen = false;
+  let locationStatus: "unknown" | "requesting" | "granted" | "denied" = "unknown";
+  let locationLat: number | null = null;
+  let locationLng: number | null = null;
+  let pendingSubmit = false;
+  let requestField: HTMLTextAreaElement | null = null;
 
-  const handleSubmit = async () => {
+  const createDraftRequest = async () => {
     errorMessage = "";
 
     if (!requestText.trim()) {
@@ -17,11 +23,17 @@
 
     isSubmitting = true;
 
+    if (locationLat === null || locationLng === null) {
+      errorMessage = "Share your location so we can match you with nearby partners.";
+      isSubmitting = false;
+      return;
+    }
+
     try {
       const docRef = await addDoc(collection(db, "requests"), {
         rawQuery: requestText.trim(),
-        lat: 25.2048,
-        lng: 55.2708,
+        lat: locationLat,
+        lng: locationLng,
         status: "draft",
         createdAt: serverTimestamp(),
       });
@@ -33,6 +45,61 @@
     } finally {
       isSubmitting = false;
     }
+  };
+
+  const handleSubmit = async () => {
+    errorMessage = "";
+
+    if (!requestText.trim()) {
+      errorMessage = "Tell us what you need to get started.";
+      return;
+    }
+
+    if (locationStatus !== "granted") {
+      pendingSubmit = true;
+      isLocationModalOpen = true;
+      return;
+    }
+
+    await createDraftRequest();
+  };
+
+  const requestLocation = () => {
+    if (!navigator.geolocation) {
+      locationStatus = "denied";
+      errorMessage = "Location services aren’t available on this device.";
+      return;
+    }
+
+    locationStatus = "requesting";
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        locationLat = position.coords.latitude;
+        locationLng = position.coords.longitude;
+        locationStatus = "granted";
+        isLocationModalOpen = false;
+
+        if (pendingSubmit) {
+          pendingSubmit = false;
+          createDraftRequest();
+        }
+      },
+      () => {
+        locationStatus = "denied";
+        isLocationModalOpen = false;
+        pendingSubmit = false;
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
+  const openLocationModal = () => {
+    errorMessage = "";
+    isLocationModalOpen = true;
+  };
+
+  const focusRequestField = () => {
+    requestField?.focus();
   };
 </script>
 
@@ -60,15 +127,43 @@
         rows="5"
         placeholder="Need last-minute flowers, a courier, or a city guide?"
         bind:value={requestText}
+        bind:this={requestField}
       ></textarea>
 
       <div class="location-row">
         <div>
           <p class="location-label">Location</p>
-          <p class="location-value">Auto-detect · Dubai</p>
+          {#if locationStatus === "granted"}
+            <p class="location-value">Location shared · Ready to match</p>
+            <p class="location-subtext">
+              Lat {locationLat?.toFixed(3)}, Lng {locationLng?.toFixed(3)}
+            </p>
+          {:else if locationStatus === "requesting"}
+            <p class="location-value">Waiting for permission…</p>
+          {:else if locationStatus === "denied"}
+            <p class="location-value">Location blocked</p>
+            <p class="location-subtext">Enable it to reach nearby partners faster.</p>
+          {:else}
+            <p class="location-value">Auto-detect after you approve</p>
+          {/if}
         </div>
-        <button class="chip" type="button">Update</button>
+        <button class="chip" type="button" on:click={openLocationModal}>
+          {locationStatus === "granted" ? "Update" : "Share location"}
+        </button>
       </div>
+
+      {#if locationStatus === "denied"}
+        <div class="location-fallback">
+          <p class="fallback-title">We couldn’t access your location.</p>
+          <p class="fallback-body">
+            You can try again or keep editing your request while we wait.
+          </p>
+          <div class="fallback-actions">
+            <button class="secondary" type="button" on:click={openLocationModal}>Try again</button>
+            <button class="ghost" type="button" on:click={focusRequestField}>Edit request</button>
+          </div>
+        </div>
+      {/if}
 
       {#if errorMessage}
         <p class="error">{errorMessage}</p>
@@ -80,6 +175,30 @@
     </form>
   </div>
 </section>
+
+{#if isLocationModalOpen}
+  <div class="modal-backdrop" role="presentation">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="location-modal-title">
+      <h2 id="location-modal-title">Share your location?</h2>
+      <p>
+        We use your location once to match you with nearby partners who can respond faster.
+      </p>
+      <ul>
+        <li>Only shared when you approve.</li>
+        <li>Stored with your request so providers can help.</li>
+        <li>Never sold or used for ads.</li>
+      </ul>
+      <div class="modal-actions">
+        <button class="secondary" type="button" on:click={() => (isLocationModalOpen = false)}>
+          Not now
+        </button>
+        <button class="primary" type="button" on:click={requestLocation}>
+          Yes, share location
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 <style>
   :global(body) {
@@ -234,6 +353,12 @@
     color: #2a2f43;
   }
 
+  .location-subtext {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: #69708a;
+  }
+
   .chip {
     border: none;
     background: #e6ebff;
@@ -247,6 +372,63 @@
 
   .chip:hover {
     background: #dde1f4;
+  }
+
+  .location-fallback {
+    border-radius: 18px;
+    border: 1px solid #f3c4c4;
+    background: #fff5f5;
+    padding: 16px 18px;
+    display: grid;
+    gap: 10px;
+  }
+
+  .fallback-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #8a1c1c;
+  }
+
+  .fallback-body {
+    margin: 0;
+    font-size: 14px;
+    color: #8a1c1c;
+  }
+
+  .fallback-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .secondary,
+  .ghost {
+    border-radius: 999px;
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .secondary {
+    border: none;
+    background: #fde0e0;
+    color: #8a1c1c;
+  }
+
+  .secondary:hover {
+    background: #f9d2d2;
+  }
+
+  .ghost {
+    border: 1px solid #f3c4c4;
+    background: transparent;
+    color: #8a1c1c;
+  }
+
+  .ghost:hover {
+    background: rgba(138, 28, 28, 0.08);
   }
 
   .error {
@@ -277,6 +459,68 @@
   .cta:disabled {
     opacity: 0.7;
     cursor: not-allowed;
+  }
+
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    z-index: 10;
+  }
+
+  .modal {
+    width: min(520px, 100%);
+    background: #ffffff;
+    border-radius: 24px;
+    padding: 28px;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
+    display: grid;
+    gap: 16px;
+  }
+
+  .modal h2 {
+    margin: 0;
+    font-size: 22px;
+    color: #1c2238;
+  }
+
+  .modal p {
+    margin: 0;
+    color: #4b5168;
+    line-height: 1.6;
+  }
+
+  .modal ul {
+    margin: 0;
+    padding-left: 18px;
+    color: #4b5168;
+    display: grid;
+    gap: 6px;
+  }
+
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+  }
+
+  .primary {
+    border: none;
+    border-radius: 999px;
+    padding: 10px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #ffffff;
+    background: #1d4ed8;
+    cursor: pointer;
+  }
+
+  .primary:hover {
+    background: #1a46c5;
   }
 
   @media (max-width: 640px) {
