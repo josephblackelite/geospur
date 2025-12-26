@@ -889,3 +889,44 @@ This is the right MVP architecture.
 10. Add push notifications setup in `apps/web/src/lib/notifications.ts` and API endpoint `POST /notify` for server-triggered messages.
 11. Enable storage uploads in `apps/web/src/lib/storage.ts` and API endpoint `POST /uploads/presign` (or direct client upload rules).
 12. Run final QA: lint/build (`npm -w apps/web run lint`, `npm -w services/api test`) and verify core flows end-to-end.
+
+---
+
+# UI/UX Flow (Screenshots-Exact)
+
+Match the screenshot flow and component hierarchy exactly. These rules apply to the target routes and component list below.
+
+## Progressive signup (OTP + name capture)
+
+- **Route**: `/`
+- **Flow**:
+  - Step 1: OTP phone entry + verification UI only.
+  - Step 2: After OTP success, immediately collect display name (single field + continue).
+  - Keep the experience progressive and linear (no combined OTP + name on the same screen).
+
+## Radar broadcast backdrop
+
+- **Route**: `/`
+- **Rule**: The radar broadcast animation/backdrop is always visible behind the primary content. It remains active as the ambient background for the home screen.
+
+## Offer cards overlay
+
+- **Route**: `/r/[id]`
+- **Rule**: Offer cards render as an overlay layer above the route request map/detail view, not inline in the page flow.
+
+## Chat accept/decline summary card
+
+- **Route**: `/chat/[id]`
+- **Rule**: Show a summary card at the top of the chat thread with accept/decline actions and request details; this card stays above the message list.
+
+## Business action inbox + reply sheet
+
+- **Route**: `/business`
+- **Rule**: The business UI is an action inbox layout; selecting a request opens a reply sheet/panel for responding without leaving the inbox.
+
+## Component list (match screenshots)
+
+- **Home (`/`)**: `RadarBackdrop`, `OtpStep`, `NameCaptureStep`, `PrimaryCta`.
+- **Request detail (`/r/[id]`)**: `RequestMap`, `RequestSummary`, `OfferCardsOverlay`.
+- **Chat (`/chat/[id]`)**: `ChatHeaderSummaryCard`, `MessageThread`, `ChatComposer`.
+- **Business (`/business`)**: `ActionInboxList`, `ReplySheet`, `OfferComposer`.
