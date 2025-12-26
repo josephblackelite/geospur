@@ -1,10 +1,14 @@
 <script lang="ts">
+  import PhotoPreviewModal from "./PhotoPreviewModal.svelte";
+
   export let businessName: string;
   export let distance = "Nearby";
   export let message: string;
   export let price: number | string | null = null;
   export let photoUrls: string[] = [];
   export let index = 0;
+
+  let previewPhotoUrl: string | null = null;
 
   const formatPrice = (value: number | string | null) => {
     if (value === null || value === undefined || value === "") {
@@ -20,6 +24,7 @@
   };
 
   $: priceLabel = formatPrice(price);
+  $: thumbnails = photoUrls.slice(0, 3);
 </script>
 
 <article class="offer-card" style={`--card-delay: ${index * 0.08}s`}>
@@ -33,16 +38,32 @@
     {/if}
   </header>
 
-  {#if photoUrls.length > 0}
+  {#if thumbnails.length > 0}
     <div class="photos">
-      {#each photoUrls as photo, idx}
-        <img src={photo} alt={`Offer photo ${idx + 1} from ${businessName}`} />
+      {#each thumbnails as photo, idx}
+        <button
+          type="button"
+          class="photo-thumb"
+          on:click={() => {
+            previewPhotoUrl = photo;
+          }}
+        >
+          <img src={photo} alt={`Offer photo ${idx + 1} from ${businessName}`} />
+        </button>
       {/each}
     </div>
   {/if}
 
   <p class="message">{message}</p>
   <button type="button" class="cta">Chat to Lock In</button>
+  <PhotoPreviewModal
+    isOpen={Boolean(previewPhotoUrl)}
+    photoUrl={previewPhotoUrl}
+    altText={previewPhotoUrl ? `Offer photo from ${businessName}` : ""}
+    on:close={() => {
+      previewPhotoUrl = null;
+    }}
+  />
 </article>
 
 <style>
@@ -95,13 +116,27 @@
     overflow-x: auto;
   }
 
-  .photos img {
+  .photo-thumb {
+    border: none;
+    padding: 0;
+    border-radius: 0.75rem;
+    background: transparent;
+    cursor: pointer;
+    flex: 0 0 auto;
+  }
+
+  .photo-thumb img {
     width: 64px;
     height: 64px;
     border-radius: 0.75rem;
     object-fit: cover;
     border: 1px solid rgba(148, 163, 184, 0.3);
-    flex: 0 0 auto;
+    display: block;
+  }
+
+  .photo-thumb:focus-visible {
+    outline: 2px solid #38bdf8;
+    outline-offset: 2px;
   }
 
   .message {
