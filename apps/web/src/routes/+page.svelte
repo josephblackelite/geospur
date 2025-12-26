@@ -41,6 +41,9 @@
 </svelte:head>
 
 <section class="page">
+  <header class="route-toggle">
+    <a class="route-link" href="/business">Business inbox</a>
+  </header>
   <div class="card">
     <div class="header">
       <p class="eyebrow">Live assistance</p>
@@ -91,11 +94,37 @@
     align-items: center;
     justify-content: center;
     padding: 48px 16px;
+    position: relative;
     background-image: radial-gradient(circle at 10% 10%, #ffffff, #f5f6fb 55%),
       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600' viewBox='0 0 800 600'%3E%3Cg fill='none' stroke='%23dfe3ee' stroke-width='2' opacity='0.5'%3E%3Cpath d='M60 120c80-50 200-40 300 20s190 70 320 40'/%3E%3Cpath d='M40 260c100-30 220-10 340 40s210 60 340 20'/%3E%3Cpath d='M80 420c120-60 240-40 360 10s210 80 300 40'/%3E%3C/g%3E%3Ccircle cx='140' cy='180' r='10' fill='%23e4e8f4'/%3E%3Ccircle cx='520' cy='260' r='14' fill='%23e4e8f4'/%3E%3Ccircle cx='300' cy='420' r='12' fill='%23e4e8f4'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: center;
     background-size: cover;
+  }
+
+  .route-toggle {
+    position: absolute;
+    top: 24px;
+    right: 24px;
+  }
+
+  .route-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid #e1e5f2;
+    font-size: 12px;
+    font-weight: 600;
+    color: #4b5168;
+    text-decoration: none;
+  }
+
+  .route-link:hover {
+    color: #2f3652;
+    border-color: #cfd6eb;
   }
 
   .card {
