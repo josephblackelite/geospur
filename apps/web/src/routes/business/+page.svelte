@@ -151,12 +151,36 @@
 
 <style>
   :global(body) {
-    background: #f8fafc;
+    background: #f6f8fc;
+    font-family: "Inter", system-ui, -apple-system, sans-serif;
   }
 
   .page {
-    padding: 2.5rem 0 4rem;
+    padding: 2.75rem 0 4.5rem;
     position: relative;
+  }
+
+  .page::before {
+    content: "";
+    position: absolute;
+    top: -120px;
+    right: -120px;
+    width: 360px;
+    height: 360px;
+    background: radial-gradient(circle, rgba(59, 130, 246, 0.35), rgba(59, 130, 246, 0.1) 50%, transparent 70%);
+    filter: blur(1px);
+    pointer-events: none;
+  }
+
+  .page::after {
+    content: "";
+    position: absolute;
+    bottom: -160px;
+    left: -160px;
+    width: 420px;
+    height: 420px;
+    background: radial-gradient(circle, rgba(125, 211, 252, 0.3), rgba(125, 211, 252, 0.08) 55%, transparent 70%);
+    pointer-events: none;
   }
 
   .route-toggle {
@@ -188,7 +212,9 @@
     justify-content: space-between;
     align-items: flex-start;
     gap: 2rem;
-    margin-bottom: 2.5rem;
+    margin-bottom: 2.75rem;
+    position: relative;
+    z-index: 1;
   }
 
   .eyebrow {
@@ -202,24 +228,29 @@
   h1 {
     margin: 0.35rem 0 0.5rem;
     font-size: clamp(2.25rem, 3vw, 3rem);
+    line-height: 1.15;
   }
 
   .subtitle {
     margin: 0;
     color: #475569;
     font-size: 1.05rem;
+    letter-spacing: 0.02em;
   }
 
   .status-toggle {
     background: white;
-    border-radius: 1.25rem;
-    border: 1px solid #e2e8f0;
-    padding: 1.25rem 1.5rem;
+    border-radius: 1.5rem;
+    border: 1px solid #e5eaf5;
+    padding: 1.4rem 1.6rem;
     min-width: 260px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 1.5rem;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+    position: relative;
+    z-index: 1;
   }
 
   .toggle-label {
@@ -236,40 +267,43 @@
   .toggle {
     border: none;
     border-radius: 999px;
-    padding: 0.6rem 1.5rem;
+    padding: 0.65rem 1.6rem;
     font-weight: 600;
-    background: #e2e8f0;
-    color: #0f172a;
+    background: #e6ebf5;
+    color: #1e293b;
     cursor: pointer;
   }
 
   .toggle.on {
-    background: #22c55e;
+    background: linear-gradient(135deg, #1d4ed8, #3b82f6);
     color: white;
   }
 
   .requests {
     display: grid;
-    gap: 1rem;
+    gap: 1.25rem;
+    position: relative;
+    z-index: 1;
   }
 
   .request-card {
     border: none;
     width: 100%;
     text-align: left;
-    padding: 1.25rem 1.5rem;
-    border-radius: 1.25rem;
+    padding: 1.5rem 1.75rem;
+    border-radius: 1.5rem;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 1.5rem;
     cursor: pointer;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
   }
 
   .request-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 18px 35px rgba(15, 23, 42, 0.15);
+    box-shadow: 0 22px 40px rgba(15, 23, 42, 0.16);
   }
 
   .request-main {
@@ -303,7 +337,10 @@
 
   .cta {
     font-weight: 700;
-    color: #0f172a;
+    color: #1d4ed8;
+    background: rgba(37, 99, 235, 0.12);
+    padding: 0.5rem 1.1rem;
+    border-radius: 999px;
   }
 
   .tint-sea {
@@ -335,9 +372,9 @@
   .sheet {
     width: min(720px, 100%);
     background: white;
-    border-radius: 1.5rem 1.5rem 0 0;
-    padding: 1.5rem 2rem 2rem;
-    box-shadow: 0 -20px 40px rgba(15, 23, 42, 0.2);
+    border-radius: 1.75rem 1.75rem 0 0;
+    padding: 1.75rem 2.25rem 2.25rem;
+    box-shadow: 0 -24px 50px rgba(15, 23, 42, 0.25);
   }
 
   .sheet header {
@@ -359,8 +396,8 @@
 
   .close {
     border: none;
-    background: #e2e8f0;
-    color: #0f172a;
+    background: #e7ecf6;
+    color: #1e293b;
     width: 36px;
     height: 36px;
     border-radius: 999px;
@@ -374,9 +411,9 @@
   }
 
   .summary {
-    background: #f8fafc;
-    border-radius: 1rem;
-    padding: 1rem 1.25rem;
+    background: #f5f7fc;
+    border-radius: 1.25rem;
+    padding: 1.15rem 1.4rem;
   }
 
   .summary .label {
@@ -394,9 +431,9 @@
   }
 
   textarea {
-    border: 1px solid #e2e8f0;
-    border-radius: 0.75rem;
-    padding: 0.75rem 1rem;
+    border: 1px solid #e1e7f3;
+    border-radius: 1rem;
+    padding: 0.85rem 1.1rem;
     font-size: 1rem;
     resize: vertical;
   }
@@ -410,17 +447,19 @@
   .sheet-actions button {
     border: none;
     border-radius: 999px;
-    padding: 0.7rem 1.5rem;
+    padding: 0.75rem 1.6rem;
     font-weight: 600;
     cursor: pointer;
-    background: #0ea5e9;
+    background: linear-gradient(135deg, #1d4ed8, #3b82f6);
     color: white;
+    box-shadow: 0 12px 24px rgba(37, 99, 235, 0.25);
   }
 
   .sheet-actions .secondary {
     background: white;
-    color: #0ea5e9;
-    border: 1px solid #bae6fd;
+    color: #1d4ed8;
+    border: 1px solid #bfdbfe;
+    box-shadow: none;
   }
 
   @media (max-width: 900px) {
